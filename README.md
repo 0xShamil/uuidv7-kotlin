@@ -1,10 +1,10 @@
 # Kotlin UUIDv7 Generator
 
-A zero dependency, dead simple version 7 UUID generator in 60 lines or less.
+A zero dependency, dead simple version 7 UUID generator in 40 lines or less.
 
 ## Features
 
-- **Zero Dependencies:** The entire implementation is under 60 lines and requires no external dependencies.
+- **Zero Dependencies:** The entire implementation is under 40 lines and requires no external dependencies.
 - **Timestamp-based UUIDs:** Embeds the current timestamp in milliseconds into the UUID for ordering.
 - **Randomness and Uniqueness:** Uses `SecureRandom` to generate high-entropy random bits.
 - **Standards Compliance:** Sets the correct version and variant bits according to the UUIDv7 draft specification.
