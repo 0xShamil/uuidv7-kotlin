@@ -1,24 +1,41 @@
 # Kotlin UUIDv7 Generator
 
-A zero dependency, dead simple version 7 UUID generator in 40 lines or less.
-
-## Features
-
-- **Zero Dependencies:** The entire implementation is under 40 lines and requires no external dependencies.
-- **Timestamp-based UUIDs:** Embeds the current timestamp in milliseconds into the UUID for ordering.
-- **Randomness and Uniqueness:** Uses `SecureRandom` to generate high-entropy random bits.
-- **Standards Compliance:** Sets the correct version and variant bits according to the UUIDv7 draft specification.
-- **Easy Integration:** Provides a singleton object `UUIDv7` with a simple `randomUUID()` method.
+A dependency-free, high-performance, monotonic UUID v7 generator in 60 lines or less.
 
 ## Usage
 
-Just copy the `UUIDv7.kt` file to your project.
+Just copy `UUIDv7.kt` into your project and call `UUIDv7.randomUUID()`.
 
 ```kotlin
 import UUIDv7
 
 fun main() {
-    val uuid = UUIDv7.randomUUID()
-    println(uuid) // 01923d43-13b4-7f90-b304-cf0ca680b6c5
+    val id: UUID = UUIDv7.randomUUID()
+    println(id) // 0192f5cd-0c2e-7a3f-b1d2-8b9a6d2b4c11
 }
 ```
+
+## K-Sortability
+
+By design, all Version 7 UUIDs are naturally sortable by the millisecond in which they were created, because the
+timestamp is placed at the very beginning of the identifier. This implementation takes this property even further. It
+guarantees that UUIDs generated within the exact same millisecond are also perfectly ordered relative to each other. It
+achieves this by using a special 12-bit monotonic counter that increments for each new UUID created in that millisecond.
+This results in a continuous stream of UUIDs that are always in a strict, lexicographical order.
+
+*Note: The per-millisecond ordering is backed by a 12-bit counter. That means up to 4096 UUIDs per millisecond can be
+strictly ordered. If more than 4096 UUIDs are generated within the same millisecond, the counter wraps and strict
+monotonicity for that millisecond is no longer guaranteed.*
+
+## High Performance
+
+The generator is intended for use in performance-critical code paths where high throughput is required. The code avoids
+unnecessary work and keeps contention low:
+
+A per-thread `SecureRandom` to remove global RNG locks. The monotonic state is managed using Atomic variables in a
+non-blocking loop, which avoids the overhead and contention of traditional locks. The byte layout is written directly
+with simple shifts and masks; version/variant bits are set in place with minimal branching.
+
+## License
+
+This code is available under an [WTFPL License](https://github.com/0xShamil/uuidv7-kotlin/blob/main/LICENSE).
