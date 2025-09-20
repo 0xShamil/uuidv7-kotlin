@@ -18,7 +18,7 @@ fun main() {
 ## K-Sortability
 
 By design, all Version 7 UUIDs are naturally sortable by the millisecond in which they were created, because the
-timestamp is placed at the very beginning of the identifier. This implementation enhances this property even further. It
+timestamp is placed at the very beginning of the identifier. This implementation takes this property even further. It
 guarantees that UUIDs generated within the exact same millisecond are also perfectly ordered relative to each other. It
 achieves this by using a special 12-bit monotonic counter that increments for each new UUID created in that millisecond.
 This results in a continuous stream of UUIDs that are always in a strict, lexicographical order.
