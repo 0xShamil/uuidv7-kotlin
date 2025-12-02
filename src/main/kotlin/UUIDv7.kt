@@ -16,11 +16,43 @@
 
 import java.security.SecureRandom
 import java.util.UUID
+import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+/**
+ * Interface to abstract the source of randomness.
+ */
+
+interface RandomProvider {
+    fun nextLong(): Long
+
+    fun nextInt(bound: Int): Int
+}
+
+/**
+ * Default provider using [ThreadLocalRandom] for maximum performance.
+ * Suitable for database IDs and general unique identifiers.
+ */
+object FastRandomProvider : RandomProvider {
+    override fun nextLong(): Long = ThreadLocalRandom.current().nextLong()
+
+    override fun nextInt(bound: Int): Int = ThreadLocalRandom.current().nextInt(bound)
+}
+
+/**
+ * Provider using [SecureRandom] wrapped in [ThreadLocal] to avoid contention.
+ * Suitable for security-sensitive identifiers (e.g., session tokens, password resets).
+ */
+class SecureRandomProvider : RandomProvider {
+    private val generator = ThreadLocal.withInitial { SecureRandom() }
+
+    override fun nextLong(): Long = generator.get().nextLong()
+
+    override fun nextInt(bound: Int): Int = generator.get().nextInt(bound)
+}
 
 object UUIDv7 {
-    private val numberGenerator: ThreadLocal<SecureRandom> = ThreadLocal.withInitial { SecureRandom() }
+    var randomProvider: RandomProvider = FastRandomProvider
 
     // Shared monotonic states
     private val lastMillis = AtomicLong(Long.MIN_VALUE)
@@ -62,7 +94,7 @@ object UUIDv7 {
         // Low 64 bits:
         // 2 bits variant (2)
         // 62 bits random
-        val randomLow = numberGenerator.get().nextLong()
+        val randomLow = randomProvider.nextLong()
         val lsb = (randomLow and 0x3FFFFFFFFFFFFFFFL) or Long.MIN_VALUE
 
         return block(msb, lsb)
@@ -82,7 +114,7 @@ object UUIDv7 {
 
             if (ts != lastTs) {
                 // New millisecond: randomize the starting point to retain entropy
-                val seeded = numberGenerator.get().nextInt(1 shl 12)
+                val seeded = randomProvider.nextInt(1 shl 12)
                 if (lastMillis.compareAndSet(lastTs, ts)) {
                     lastSeq12.set(seeded)
                     return seeded

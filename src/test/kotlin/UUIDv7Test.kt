@@ -23,6 +23,7 @@ import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import kotlin.time.measureTime
 
 class UUIDv7Test {
 
@@ -245,6 +246,20 @@ class UUIDv7Test {
         } while (extractTimestamp(u2) == ts1)
 
         assertTrue(u1 < u2, "UUID with later millisecond should be greater")
+    }
+
+    @Test
+    fun `test speed of generation with SecureRandomProvider`() {
+        val count = 1_000_000
+        UUIDv7.randomProvider = SecureRandomProvider()
+        measureTime { repeat(count) { UUIDv7.randomUUID() } }.also { println("Time taken: $it, average: ${it / count}") }
+    }
+
+    @Test
+    fun `test speed of generation with FastRandomProvider`() {
+        val count = 1_000_000
+        UUIDv7.randomProvider = FastRandomProvider
+        measureTime { repeat(count) { UUIDv7.randomUUID() } }.also { println("Time taken: $it, average: ${it / count}") }
     }
 
     private fun extractTimestamp(uuid: UUID): Long {
