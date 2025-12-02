@@ -29,67 +29,43 @@ object UUIDv7 {
     /**
      * @return A UUID object representing a UUIDv7 value.
      */
-    fun randomUUID(): UUID {
-        val bytes = randomBytesMonotonic()
-        val msb = bytes.toLongBE(0)
-        val lsb = bytes.toLongBE(8)
-        return UUID(msb, lsb)
-    }
+    fun randomUUID(): UUID = generate { msb, lsb -> UUID(msb, lsb) }
 
     /**
-     * Generates a 16-byte array.
-     * The first 6 bytes contain the current timestamp in milliseconds.
-     * The next bytes are random, with specific bits set for version and variant.
+     * Generates the most significant bits (MSB) and least significant bits (LSB) for a UUIDv7
+     * and passes them to the provided [block].
      *
-     * Layout:
-     *  - [0..5]   : 48-bit Unix epoch milliseconds (timestamp)
-     *  - [6]      : high nibble = version 7, low nibble = rand_a[11:8]
-     *  - [7]      : rand_a[7:0] (12-bit monotonic sequence, wraps mod 4096)
-     *  - [8]      : IETF variant in high 2 bits, lower 6 bits random
-     *  - [9..15]  : remaining 62 bits of randomness across [8..15], except variant bits
+     * MSB Layout:
+     * - 48 bits: Timestamp
+     * -  4 bits: Version (7)
+     * - 12 bits: Sequence
      *
+     * LSB Layout:
+     * -  2 bits: Variant (2)
+     * - 62 bits: Random
      *
-     * @return A ByteArray of 16 bytes representing the UUIDv7.
+     * @param block A function that accepts the MSB and LSB and returns a result of type [T].
+     * @return The result returned by [block].
      */
-    private fun randomBytesMonotonic(): ByteArray {
-        val value = ByteArray(16).also { numberGenerator.get().nextBytes(it) }
-
+    private inline fun <T> generate(block: (Long, Long) -> T): T {
         val now = System.currentTimeMillis()
         val prev = lastMillis.get()
         val ts = if (now >= prev) now else prev // clamp to avoid regressions
+        val seq = nextSeq(ts)
 
-        value[0] = ((ts ushr 40) and 0xFF).toByte()
-        value[1] = ((ts ushr 32) and 0xFF).toByte()
-        value[2] = ((ts ushr 24) and 0xFF).toByte()
-        value[3] = ((ts ushr 16) and 0xFF).toByte()
-        value[4] = ((ts ushr 8) and 0xFF).toByte()
-        value[5] = (ts and 0xFF).toByte()
+        // High 64 bits:
+        // 48 bits timestamp
+        // 4 bits version (7)
+        // 12 bits sequence (high part of random)
+        val msb = (ts shl 16) or 0x7000L or seq.toLong()
 
-        // If same millisecond as last call, increment 12-bit counter else reseed
-        val seq: Int = nextSeq(ts)
+        // Low 64 bits:
+        // 2 bits variant (2)
+        // 62 bits random
+        val randomLow = numberGenerator.get().nextLong()
+        val lsb = (randomLow and 0x3FFFFFFFFFFFFFFFL) or Long.MIN_VALUE
 
-        // Set the version to 7 in high nibble of byte 6
-        value[6] = (((0x7 shl 4) or ((seq ushr 8) and 0x0F))).toByte()
-
-        // Set low 8 bits of rand_a in byte 7
-        value[7] = (seq and 0xFF).toByte()
-
-        // Set the variant to IETF variant
-        value[8] = ((value[8].toInt() and 0x3F) or 0x80).toByte()
-
-        return value
-    }
-
-    // Big-endian 8-byte to long
-    private fun ByteArray.toLongBE(offset: Int = 0): Long {
-        return (this[offset].toLong() and 0xFF shl 56) or
-                (this[offset + 1].toLong() and 0xFF shl 48) or
-                (this[offset + 2].toLong() and 0xFF shl 40) or
-                (this[offset + 3].toLong() and 0xFF shl 32) or
-                (this[offset + 4].toLong() and 0xFF shl 24) or
-                (this[offset + 5].toLong() and 0xFF shl 16) or
-                (this[offset + 6].toLong() and 0xFF shl 8) or
-                (this[offset + 7].toLong() and 0xFF)
+        return block(msb, lsb)
     }
 
     /**
